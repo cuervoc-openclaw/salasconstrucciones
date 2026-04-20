@@ -1,0 +1,153 @@
+---
+const accent = '#F2B705';
+---
+<div id="cs-asst">
+  <button id="cs-asst-toggle" aria-label="Asistente" style="position:fixed;right:18px;bottom:18px;z-index:50;background:var(--accent, #F2B705);color:#1F1F1F;border:none;border-radius:999px;width:56px;height:56px;box-shadow:0 8px 20px rgba(0,0,0,.15);cursor:pointer;">✦</button>
+  <div id="cs-asst-panel" style="display:none;position:fixed;right:18px;bottom:84px;width:360px;max-width:92vw;height:520px;max-height:70vh;background:#fff;border:1px solid #eaeaea;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.18);z-index:50;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #eee;background:#1F1F1F;color:#fff;">
+      <div style="display:flex;align-items:center;gap:10px;"><span style="display:inline-flex;width:10px;height:10px;background:var(--accent, #F2B705);border-radius:999px;"></span><strong>Asistente de Construcción</strong></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <select id="cs-asst-lang" style="background:#2b2b2b;color:#fff;border:1px solid #444;border-radius:8px;padding:4px 8px;">
+          <option value="es">ES</option>
+          <option value="en">EN</option>
+        </select>
+        <button id="cs-asst-close" aria-label="Cerrar" style="background:transparent;color:#fff;border:none;font-size:18px;cursor:pointer;">✕</button>
+      </div>
+    </div>
+    <div id="cs-asst-messages" style="padding:12px;display:flex;flex-direction:column;gap:10px;height:calc(100% - 120px);overflow:auto;">
+      <div class="msg assistant" style="align-self:flex-start;max-width:82%;padding:10px 12px;border-radius:12px;background:#F4F4F4;color:#1F1F1F;">Hola, soy tu asistente 24/7. ¿En qué podemos ayudarte? Electricidad, plomería, pintura o remodelaciones.</div>
+      <div id="cs-asst-quick" style="display:flex;flex-wrap:wrap;gap:6px;">
+        <button data-q="obra nueva" class="chip">Obra nueva</button>
+        <button data-q="reforma integral" class="chip">Reforma integral</button>
+        <button data-q="cocina" class="chip">Cocina</button>
+        <button data-q="baño" class="chip">Baño</button>
+        <button data-q="pintura" class="chip">Pintura</button>
+        <button data-q="impermeabilización" class="chip">Impermeabilización</button>
+      </div>
+    </div>
+    <div style="border-top:1px solid #eee;padding:8px;">
+      <form id="cs-asst-form" style="display:flex;gap:8px;">
+        <input id="cs-asst-input" type="text" placeholder="Escribe tu consulta..." style="flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:10px;outline:none;">
+        <button type="submit" style="background:var(--accent, #F2B705);color:#1F1F1F;border:none;border-radius:10px;padding:0 14px;cursor:pointer;">Enviar</button>
+      </form>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#666;">
+        <input id="cs-asst-consent" type="checkbox"> Autorizo el uso de mis datos para ser contactado
+      </label>
+      <div id="cs-asst-typing" style="display:none;margin-top:6px;font-size:12px;color:#666;">Escribiendo…</div>
+    </div>
+  </div>
+</div>
+<script is:inline>
+  (function () {
+    const el = document.getElementById('cs-asst');
+    if (!el) return;
+
+    const panel = el.querySelector('#cs-asst-panel');
+    const toggle = el.querySelector('#cs-asst-toggle');
+    const closeBtn = el.querySelector('#cs-asst-close');
+    const list = el.querySelector('#cs-asst-messages');
+    const form = el.querySelector('#cs-asst-form');
+    const input = el.querySelector('#cs-asst-input');
+    const consent = el.querySelector('#cs-asst-consent');
+    const typing = el.querySelector('#cs-asst-typing');
+    const quick = el.querySelector('#cs-asst-quick');
+    const langSel = el.querySelector('#cs-asst-lang');
+
+    if (!panel || !toggle || !closeBtn || !list || !form || !input || !consent || !typing || !langSel) return;
+
+    let context = {};
+    let locale = (navigator.language || 'es').startsWith('es') ? 'es' : 'en';
+    langSel.value = locale;
+
+    toggle.addEventListener('click', () => {
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+    closeBtn.addEventListener('click', () => {
+      panel.style.display = 'none';
+    });
+    langSel.addEventListener('change', () => {
+      locale = langSel.value === 'es' ? 'es' : 'en';
+    });
+
+    function push(role, text) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + role;
+      div.style.alignSelf = role === 'user' ? 'flex-end' : 'flex-start';
+      div.style.maxWidth = '82%';
+      div.style.padding = '10px 12px';
+      div.style.borderRadius = '12px';
+      div.style.background = role === 'user' ? 'var(--accent, #F2B705)' : '#F4F4F4';
+      div.style.color = '#1F1F1F';
+      div.textContent = text;
+      list.appendChild(div);
+      list.scrollTop = list.scrollHeight;
+    }
+
+    function setTyping(v) {
+      typing.style.display = v ? 'block' : 'none';
+    }
+
+    if (quick) {
+      quick.addEventListener('click', (e) => {
+        const target = e.target instanceof Element ? e.target : null;
+        const b = target ? target.closest('button') : null;
+        if (!b) return;
+        input.value = b.getAttribute('data-q') || '';
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = (input.value || '').trim();
+      if (!text) return;
+
+      push('user', text);
+      input.value = '';
+      setTyping(true);
+
+      const t0 = performance.now();
+      const msgs = Array.from(list.querySelectorAll('.msg')).map((m) => {
+        const r = m.classList.contains('assistant') ? 'assistant' : 'user';
+        return { role: r, content: m.textContent || '' };
+      });
+
+      const res = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: msgs, context, locale, consent: !!consent.checked })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      context = data.context || context;
+      setTyping(false);
+      push('assistant', data.reply || (locale === 'es' ? 'Entendido.' : 'Got it.'));
+
+      const dt = Math.round(performance.now() - t0);
+      try {
+        fetch('/api/metrics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'assistant_reply', data: { dt } })
+        });
+      } catch {}
+
+      try {
+        if (context && context.name && (context.phone || context.email) && context.consent) {
+          fetch('/api/metrics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event: 'lead_submitted', data: { score: context.score || 0 } })
+          });
+        }
+      } catch {}
+    });
+  })();
+</script>
+<style>
+  :root { --accent: #F2B705; }
+  .chip { border:1px solid #eee; background:#fff; color:#1F1F1F; padding:6px 10px; border-radius:999px; cursor:pointer; }
+  @media (max-width: 480px) {
+    #cs-asst-panel { right: 10px; bottom: 74px; width: 92vw; height: 70vh; }
+  }
+</style>

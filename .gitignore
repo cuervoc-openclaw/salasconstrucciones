@@ -1,0 +1,28 @@
+# Ignore everything in the workspace by default
+*
+
+# Keep repository metadata
+!.gitignore
+!README.md
+
+# Keep Astro frontend
+!ContruccionesSalas/
+!ContruccionesSalas/**
+
+# Astro build/runtime noise
+ContruccionesSalas/node_modules/
+ContruccionesSalas/dist/
+ContruccionesSalas/.astro/
+ContruccionesSalas/.env
+ContruccionesSalas/.env.*
+
+# Keep only the custom WordPress theme
+!ContruccionesSalasCMS/
+ContruccionesSalasCMS/*
+!ContruccionesSalasCMS/wp-content/
+ContruccionesSalasCMS/wp-content/*
+!ContruccionesSalasCMS/wp-content/themes/
+ContruccionesSalasCMS/wp-content/themes/*
+!ContruccionesSalasCMS/wp-content/themes/construccionessalas/
+!ContruccionesSalasCMS/wp-content/themes/construccionessalas/**
+

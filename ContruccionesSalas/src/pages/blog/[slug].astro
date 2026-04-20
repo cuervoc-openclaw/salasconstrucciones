@@ -1,0 +1,200 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const base = import.meta.env.PUBLIC_WP_BASE_URL;
+
+function stripHtml(v: unknown) {
+    const s = typeof v === 'string' ? v : '';
+    return s.replace(/<[^>]*>/g, '').trim();
+}
+
+export async function getStaticPaths() {
+    const base = import.meta.env.PUBLIC_WP_BASE_URL;
+    if (!base) return [];
+    try {
+        const res = await fetch(`${base}/wp-json/wp/v2/posts?per_page=100&_embed=1&orderby=date&order=desc`);
+        if (!res.ok) return [];
+        const posts = await res.json();
+        if (!Array.isArray(posts)) return [];
+        return posts
+            .filter((p) => p && typeof p.slug === 'string' && p.slug)
+            .map((p) => ({
+                params: { slug: p.slug },
+                props: {
+                    post: {
+                        slug: p.slug,
+                        title: p?.title?.rendered || '',
+                        excerpt: p?.excerpt?.rendered || '',
+                        content: p?.content?.rendered || '',
+                        date: p?.date || '',
+                        img: p?._embedded?.['wp:featuredmedia']?.[0]?.source_url || '',
+                    },
+                },
+            }));
+    } catch {
+        return [];
+    }
+}
+
+const { post } = Astro.props as any;
+const titleText = stripHtml(post?.title) || 'Artículo';
+const descText = stripHtml(post?.excerpt) || 'Artículo del blog de Construcciones Salas.';
+const date = typeof post?.date === 'string' ? post.date : '';
+const img = typeof post?.img === 'string' ? post.img : '';
+const html = typeof post?.content === 'string' ? post.content : '';
+---
+
+<Layout title={`${titleText} | Blog`} description={descText}>
+    <main class="page">
+        <header class="site-header">
+            <div class="container header-inner">
+                <a class="brand" href="/">
+                    <span class="brand-text">Construcciones Salas</span>
+                </a>
+                <nav class="header-actions">
+                    <a class="btn btn-outline" href="/blog">Volver al blog</a>
+                    <a class="btn btn-primary" href="/#contacto">Pedir presupuesto</a>
+                </nav>
+            </div>
+        </header>
+
+        <article class="post">
+            <div class="container">
+                <p class="crumb"><a href="/blog">Blog</a> / {titleText}</p>
+                <h1>{titleText}</h1>
+                {date && <time datetime={date}>{new Date(date).toLocaleDateString('es-CL')}</time>}
+                {img && <img class="cover" src={img} alt={titleText} loading="eager" fetchpriority="high" decoding="async" />}
+                <div class="content" set:html={html}></div>
+            </div>
+        </article>
+    </main>
+</Layout>
+
+<style>
+    .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: var(--bg);
+        border-bottom: 1px solid #eaeaea;
+    }
+    .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 72px;
+        gap: 14px;
+    }
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
+    }
+    .brand-text {
+        color: var(--dark);
+        font-size: 18px;
+    }
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: transform .08s ease, box-shadow .2s ease, background .2s ease, color .2s ease, border-color .2s ease;
+    }
+    .btn-primary {
+        background: var(--accent);
+        color: var(--dark);
+        box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 6px 16px rgba(0,0,0,.08);
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 0 rgba(0,0,0,.08), 0 10px 22px rgba(0,0,0,.12);
+    }
+    .btn-outline {
+        border: 2px solid var(--dark);
+        color: var(--dark);
+        background: transparent;
+    }
+    .btn-outline:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .post {
+        padding: 34px 0 70px;
+    }
+    .crumb {
+        margin: 0 0 12px;
+        color: #7a7a7a;
+        font-size: 13px;
+    }
+    .crumb a:hover {
+        color: var(--accent);
+    }
+    h1 {
+        font-size: clamp(28px, 3.4vw, 44px);
+        line-height: 1.12;
+        margin: 0 0 10px;
+        max-width: 40ch;
+    }
+    time {
+        display: inline-block;
+        color: #7a7a7a;
+        font-size: 13px;
+        margin-bottom: 16px;
+    }
+    .cover {
+        width: 100%;
+        max-height: 420px;
+        object-fit: cover;
+        border-radius: 16px;
+        border: 1px solid #eee;
+        margin: 12px 0 18px;
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 10px 22px rgba(0,0,0,.06);
+    }
+    .content :global(p) {
+        line-height: 1.75;
+        color: #2a2a2a;
+        margin: 0 0 14px;
+        max-width: 75ch;
+    }
+    .content :global(h2) {
+        margin: 24px 0 10px;
+        font-size: 24px;
+    }
+    .content :global(h3) {
+        margin: 18px 0 8px;
+        font-size: 20px;
+    }
+    .content :global(ul), .content :global(ol) {
+        margin: 0 0 14px 20px;
+        max-width: 75ch;
+        line-height: 1.75;
+    }
+    .content :global(a) {
+        color: #0f4ea8;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+    .content :global(img) {
+        max-width: 100%;
+        height: auto;
+        border-radius: 14px;
+        border: 1px solid #eee;
+    }
+    @media (max-width: 600px) {
+        .btn { padding: 10px 12px; }
+        .header-inner { align-items: flex-start; height: auto; padding: 12px 0; }
+    }
+</style>

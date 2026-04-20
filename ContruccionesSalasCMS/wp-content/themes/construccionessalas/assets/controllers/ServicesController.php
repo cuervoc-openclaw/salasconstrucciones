@@ -1,0 +1,100 @@
+<?php
+/**
+ * Controlador del Custom Post Type "servicio".
+ * Expone servicios vía REST y registra el metacampo 'icon_slug' para íconos en la landing de Astro.
+ * Uso: crear servicios en el admin, definir extracto, imagen destacada y meta 'icon_slug'.
+ */
+namespace CSalas\Controllers;
+class ServicesController{
+    public static function register(){
+        // CPT de servicios (REST habilitado)
+        register_post_type('servicio',[
+            'label'=>'Servicios',
+            'public'=>true,
+            'show_in_rest'=>true,
+            'supports'=>['title','excerpt','thumbnail','custom-fields'],
+            'menu_position'=>20,
+        ]);
+        register_post_type('hero_slide',[
+            'label'=>'Slides (Hero)',
+            'public'=>true,
+            'show_in_rest'=>true,
+            'supports'=>['title','thumbnail','page-attributes'],
+            'menu_position'=>21,
+            'menu_icon'=>'dashicons-format-gallery',
+        ]);
+        register_post_type('proyecto',[
+            'label'=>'Proyectos',
+            'public'=>true,
+            'show_in_rest'=>true,
+            'supports'=>['title','editor','excerpt','thumbnail','page-attributes'],
+            'menu_position'=>22,
+            'menu_icon'=>'dashicons-portfolio',
+        ]);
+        register_post_type('testimonio',[
+            'label'=>'Testimonios',
+            'public'=>true,
+            'show_in_rest'=>true,
+            'supports'=>['title','editor','thumbnail','page-attributes'],
+            'menu_position'=>23,
+            'menu_icon'=>'dashicons-testimonial',
+        ]);
+        register_post_type('faq',[
+            'label'=>'FAQs',
+            'public'=>true,
+            'show_in_rest'=>true,
+            'supports'=>['title','editor','page-attributes'],
+            'menu_position'=>24,
+            'menu_icon'=>'dashicons-editor-help',
+        ]);
+        // Metacampo de icono para cada servicio (slug validado en helpers)
+        register_post_meta('servicio','icon_slug',[
+            'type'=>'string',
+            'single'=>true,
+            'show_in_rest'=>true,
+            'default'=>'bolt'
+        ]);
+        register_post_meta('servicio','csalas_price_base',[
+            'type'=>'integer',
+            'single'=>true,
+            'show_in_rest'=>true,
+            'default'=>0
+        ]);
+        register_post_meta('servicio','csalas_price_unit',[
+            'type'=>'string',
+            'single'=>true,
+            'show_in_rest'=>true,
+            'default'=>'servicio'
+        ]);
+        register_post_meta('servicio','csalas_price_min',[
+            'type'=>'integer',
+            'single'=>true,
+            'show_in_rest'=>true,
+            'default'=>0
+        ]);
+        register_post_meta('servicio','csalas_price_note',[
+            'type'=>'string',
+            'single'=>true,
+            'show_in_rest'=>true,
+            'default'=>''
+        ]);
+        register_post_meta('testimonio','csalas_testimonial_service',[
+            'type'=>'string',
+            'single'=>true,
+            'show_in_rest'=>true,
+            'default'=>''
+        ]);
+        register_post_meta('testimonio','csalas_testimonial_location',[
+            'type'=>'string',
+            'single'=>true,
+            'show_in_rest'=>true,
+            'default'=>''
+        ]);
+        register_post_meta('testimonio','csalas_testimonial_rating',[
+            'type'=>'integer',
+            'single'=>true,
+            'show_in_rest'=>true,
+            'default'=>5
+        ]);
+    }
+}

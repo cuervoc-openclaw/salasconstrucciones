@@ -1,0 +1,78 @@
+---
+const {
+    title = 'Construcciones Salas',
+    description = 'Servicios profesionales de construcción y mantenimiento para casas, oficinas y departamentos.',
+} = Astro.props;
+
+const canonical = Astro.url;
+const ogType = canonical.pathname.startsWith('/blog/') ? 'article' : 'website';
+const ogImage = Astro.site ? new URL('/logo.png', Astro.site).href : '/logo.png';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" type="image/png" href="/logo.png" />
+		<meta name="generator" content={Astro.generator} />
+        <meta name="theme-color" content="#F2B705" />
+        <meta name="description" content={description} />
+        <meta name="robots" content="index,follow" />
+        <link rel="canonical" href={canonical.href} />
+
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:type" content={ogType} />
+        <meta property="og:url" content={canonical.href} />
+        <meta property="og:locale" content="es_CL" />
+        <meta property="og:image" content={ogImage} />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={ogImage} />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+		<title>{title}</title>
+        <slot name="head" />
+	</head>
+	<body>
+		<slot />
+	</body>
+</html>
+
+<style is:global>
+    :root {
+        --accent: #F2B705;
+        --dark: #1F1F1F;
+        --bg: #FFFFFF;
+        --bg-muted: #F4F4F4;
+        --text: #2A2A2A;
+    }
+    html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    h1, h2, h3 {
+        color: var(--dark);
+        margin: 0;
+    }
+    a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .container {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 clamp(16px, 4vw, 40px);
+    }
+</style>

@@ -1,0 +1,197 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const base = import.meta.env.PUBLIC_WP_BASE_URL;
+let projects: any[] = [];
+
+function stripHtml(v: unknown) {
+    const s = typeof v === 'string' ? v : '';
+    return s.replace(/<[^>]*>/g, '').trim();
+}
+
+if (base) {
+    try {
+        const res = await fetch(`${base}/wp-json/wp/v2/proyecto?per_page=24&_embed=1&orderby=menu_order&order=asc`);
+        if (res.ok) projects = await res.json();
+    } catch {}
+}
+
+const items = projects.map((p) => {
+    const title = stripHtml(p?.title?.rendered);
+    const excerpt = stripHtml(p?.excerpt?.rendered);
+    const img = p?._embedded?.['wp:featuredmedia']?.[0]?.source_url || '';
+    return { slug: p?.slug || '', title, excerpt, img };
+});
+---
+
+<Layout
+    title="Proyectos | Construcciones Salas"
+    description="Galería de trabajos realizados: electricidad, remodelaciones, reparaciones y terminaciones en comunas de Santiago."
+>
+    <main class="page">
+        <header class="site-header">
+            <div class="container header-inner">
+                <a class="brand" href="/">
+                    <span class="brand-text">Construcciones Salas</span>
+                </a>
+                <nav class="header-actions">
+                    <a class="btn btn-outline" href="/blog">Blog</a>
+                    <a class="btn btn-primary" href="/#servicios">Cotizar</a>
+                </nav>
+            </div>
+        </header>
+
+        <section class="hero">
+            <div class="container">
+                <h1>Galería de trabajos</h1>
+                <p>Revisa proyectos reales y fotos de trabajos realizados.</p>
+            </div>
+        </section>
+
+        <section class="list">
+            <div class="container">
+                {items.length === 0 ? (
+                    <p class="muted">Aún no hay proyectos publicados.</p>
+                ) : (
+                    <div class="grid">
+                        {items.map((p) => (
+                            <a class="card" href={`/proyectos/${p.slug}`}>
+                                {p.img && <img src={p.img} alt={p.title || 'Proyecto'} loading="lazy" decoding="async" />}
+                                <div class="body">
+                                    <h2>{p.title}</h2>
+                                    {p.excerpt && <p>{p.excerpt}</p>}
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </section>
+    </main>
+</Layout>
+
+<style>
+    .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: var(--bg);
+        border-bottom: 1px solid #eaeaea;
+    }
+    .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 72px;
+        gap: 12px;
+    }
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
+    }
+    .brand-text {
+        color: var(--dark);
+        font-size: 18px;
+    }
+    .header-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: 700;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+    }
+    .btn-primary {
+        background: var(--accent);
+        color: var(--dark);
+        box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 6px 16px rgba(0,0,0,.08);
+    }
+    .btn-outline {
+        border: 2px solid var(--dark);
+        color: var(--dark);
+        background: transparent;
+    }
+    .btn-outline:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .hero {
+        padding: 36px 0;
+        background: var(--bg-muted);
+    }
+    .hero h1 {
+        font-size: 34px;
+        line-height: 1.15;
+        margin: 0 0 10px;
+    }
+    .hero p {
+        margin: 0;
+        color: #5a5a5a;
+        max-width: 70ch;
+        line-height: 1.6;
+    }
+    .list {
+        padding: 44px 0 64px;
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+    }
+    .card {
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 18px rgba(0,0,0,.04);
+        display: grid;
+    }
+    .card:hover {
+        border-color: rgba(242,183,5,.55);
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 12px 26px rgba(0,0,0,.08);
+    }
+    .card img {
+        width: 100%;
+        aspect-ratio: 16/10;
+        object-fit: cover;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .body {
+        padding: 14px 16px 16px;
+        display: grid;
+        gap: 8px;
+    }
+    h2 {
+        font-size: 18px;
+        line-height: 1.25;
+        margin: 0;
+    }
+    .body p {
+        margin: 0;
+        color: #5a5a5a;
+        line-height: 1.6;
+    }
+    .muted {
+        color: #5a5a5a;
+    }
+    @media (max-width: 900px) {
+        .grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+        .grid { grid-template-columns: 1fr; }
+    }
+</style>
+

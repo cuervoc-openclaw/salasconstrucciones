@@ -1,0 +1,210 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+function stripHtml(v: unknown) {
+    const s = typeof v === 'string' ? v : '';
+    return s.replace(/<[^>]*>/g, '').trim();
+}
+
+export async function getStaticPaths() {
+    const base = import.meta.env.PUBLIC_WP_BASE_URL;
+    if (!base) return [];
+    try {
+        const res = await fetch(`${base}/wp-json/wp/v2/proyecto?per_page=100&_embed=1&orderby=menu_order&order=asc`);
+        if (!res.ok) return [];
+        const posts = await res.json();
+        if (!Array.isArray(posts)) return [];
+        return posts
+            .filter((p) => p && typeof p.slug === 'string' && p.slug)
+            .map((p) => ({
+                params: { slug: p.slug },
+                props: {
+                    project: {
+                        slug: p.slug,
+                        title: p?.title?.rendered || '',
+                        excerpt: p?.excerpt?.rendered || '',
+                        content: p?.content?.rendered || '',
+                        img: p?._embedded?.['wp:featuredmedia']?.[0]?.source_url || '',
+                    },
+                },
+            }));
+    } catch {
+        return [];
+    }
+}
+
+const { project } = Astro.props as any;
+const titleText = stripHtml(project?.title) || 'Proyecto';
+const descText = stripHtml(project?.excerpt) || 'Trabajo realizado por Construcciones Salas.';
+const img = typeof project?.img === 'string' ? project.img : '';
+const html = typeof project?.content === 'string' ? project.content : '';
+---
+
+<Layout title={`${titleText} | Proyectos`} description={descText}>
+    <main class="page">
+        <header class="site-header">
+            <div class="container header-inner">
+                <a class="brand" href="/">
+                    <span class="brand-text">Construcciones Salas</span>
+                </a>
+                <nav class="header-actions">
+                    <a class="btn btn-outline" href="/proyectos">Volver</a>
+                    <a class="btn btn-primary" href="/#servicios">Cotizar</a>
+                </nav>
+            </div>
+        </header>
+
+        <article class="post">
+            <div class="container">
+                <p class="crumb"><a href="/proyectos">Proyectos</a> / {titleText}</p>
+                <h1>{titleText}</h1>
+                {img && <img class="cover" src={img} alt={titleText} loading="eager" fetchpriority="high" decoding="async" />}
+                <div class="content" set:html={html}></div>
+            </div>
+        </article>
+    </main>
+</Layout>
+
+<style>
+    .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: var(--bg);
+        border-bottom: 1px solid #eaeaea;
+    }
+    .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 72px;
+        gap: 12px;
+    }
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
+    }
+    .brand-text {
+        color: var(--dark);
+        font-size: 18px;
+    }
+    .header-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: 700;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+    }
+    .btn-primary {
+        background: var(--accent);
+        color: var(--dark);
+        box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 6px 16px rgba(0,0,0,.08);
+    }
+    .btn-outline {
+        border: 2px solid var(--dark);
+        color: var(--dark);
+        background: transparent;
+    }
+    .btn-outline:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .post {
+        padding: 34px 0 70px;
+    }
+    .crumb {
+        margin: 0 0 12px;
+        color: #7a7a7a;
+        font-size: 13px;
+    }
+    .crumb a:hover {
+        color: var(--accent);
+    }
+    h1 {
+        font-size: clamp(28px, 3.4vw, 44px);
+        line-height: 1.12;
+        margin: 0 0 10px;
+        max-width: 40ch;
+    }
+    .cover {
+        width: 100%;
+        max-height: 440px;
+        object-fit: cover;
+        border-radius: 16px;
+        border: 1px solid #eee;
+        margin: 12px 0 18px;
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 10px 22px rgba(0,0,0,.06);
+    }
+    .content :global(p) {
+        line-height: 1.75;
+        color: #2a2a2a;
+        margin: 0 0 14px;
+        max-width: 75ch;
+    }
+    .content :global(h2) {
+        margin: 24px 0 10px;
+        font-size: 24px;
+    }
+    .content :global(h3) {
+        margin: 18px 0 8px;
+        font-size: 20px;
+    }
+    .content :global(ul), .content :global(ol) {
+        margin: 0 0 14px 20px;
+        max-width: 75ch;
+        line-height: 1.75;
+    }
+    .content :global(a) {
+        color: #0f4ea8;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+    .content :global(img) {
+        max-width: 100%;
+        height: auto;
+        border-radius: 14px;
+        border: 1px solid #eee;
+    }
+    .content :global(.wp-block-gallery),
+    .content :global(.blocks-gallery-grid) {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        padding: 0;
+        margin: 0 0 16px;
+        list-style: none;
+        max-width: 100%;
+    }
+    .content :global(.wp-block-gallery .wp-block-image),
+    .content :global(.blocks-gallery-grid .blocks-gallery-item) {
+        margin: 0;
+    }
+    .content :global(.wp-block-gallery img),
+    .content :global(.blocks-gallery-grid img) {
+        width: 100%;
+        aspect-ratio: 4/3;
+        object-fit: cover;
+    }
+    @media (max-width: 600px) {
+        .btn { padding: 10px 12px; }
+        .header-inner { align-items: flex-start; height: auto; padding: 12px 0; }
+        .content :global(.wp-block-gallery),
+        .content :global(.blocks-gallery-grid) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>

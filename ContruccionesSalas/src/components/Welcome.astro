@@ -1,0 +1,1435 @@
+---
+const base = import.meta.env.PUBLIC_WP_BASE_URL;
+let landing: any = null;
+let sliderRaw: any = null;
+if (base) {
+    try {
+        const res = await fetch(`${base}/wp-json/csalas/v1/landing`);
+        if (res.ok) landing = await res.json();
+    } catch {}
+    try {
+        const res = await fetch(`${base}/wp-json/csalas/v1/hero-slider`);
+        if (res.ok) sliderRaw = await res.json();
+    } catch {}
+}
+const hero = landing?.hero ?? {
+    title: 'Construcción y arreglos confiables',
+    subtitle: 'Servicios profesionales para casas, oficinas y departamentos. Electricidad, plomería, pintura y remodelaciones con calidad y seguridad.',
+    ctaPrimary: { label: 'Solicitar presupuesto', href: '#contacto' },
+    ctaSecondary: { label: 'Llamar ahora', href: '#contacto' },
+};
+const services = landing?.services ?? [
+    { title: 'Electricidad', excerpt: 'Instalaciones, cableado, tableros, iluminación y mantenimiento eléctrico seguro.', icon: 'bolt' },
+    { title: 'Plomería', excerpt: 'Tuberías, fugas, calentadores, sanitarios y redes hidráulicas eficientes.', icon: 'pipe' },
+    { title: 'Pintura', excerpt: 'Acabados interiores y exteriores, preparación de superficies y recubrimientos.', icon: 'paint' },
+    { title: 'Remodelaciones', excerpt: 'Optimización de espacios, acabados, carpintería y obras civiles.', icon: 'home' },
+];
+const contact = landing?.contact ?? { phone: '', whatsapp: '', email: '' };
+const contactCopy = landing?.contactCopy ?? {
+    title: 'Listos para ayudarte',
+    subtitle: 'Atención rápida y confiable. Agenda una visita o cotiza hoy.',
+};
+const about = landing?.about ?? {
+    title: 'Sobre nosotros',
+    text: 'Más de 30 años de experiencia en construcción y trabajos eléctricos. Especialista en electricidad y certificación de planos eléctricos.',
+};
+const coverage = landing?.coverage ?? {
+    title: 'Zonas de cobertura',
+    text: 'Atendemos comunas de Santiago y sectores cercanos.',
+};
+const sliderEnabled = landing?.sliderEnabled !== false;
+const projects = Array.isArray(landing?.projects) ? landing.projects : [];
+const testimonials = Array.isArray(landing?.testimonials) ? landing.testimonials : [];
+const faqEnabled = landing?.faqEnabled ?? true;
+const faqs = faqEnabled
+    ? (Array.isArray(landing?.faqs) ? landing.faqs : [
+        { question: '¿El presupuesto tiene costo?', answer: 'No, el presupuesto es sin compromiso.' },
+        { question: '¿En qué comunas trabajan?', answer: 'En comunas de Santiago y sectores cercanos.' },
+        { question: '¿Ofrecen garantía?', answer: 'Sí, todos los trabajos se entregan con garantía.' },
+        { question: '¿Hacen urgencias eléctricas?', answer: 'Sí, según disponibilidad horaria.' },
+    ])
+    : [];
+
+function phoneDigits(v: string) {
+    return (v || '').replace(/[^\d]/g, '');
+}
+const waDigits = phoneDigits(contact.whatsapp || contact.phone);
+const whatsappHref = waDigits ? `https://wa.me/${waDigits}` : '#';
+
+function parseComunas(v: string) {
+    const raw = (v || '').trim();
+    const hasListHints = raw.includes(',') || raw.includes('\n') || raw.includes(';');
+    if (!hasListHints) return [];
+
+    let s = raw;
+    if (s.includes(':')) s = s.split(':').slice(1).join(':');
+    s = s.replace(/\.[\s]*$/g, '');
+    s = s.replace(/\by\b/gi, ',');
+    s = s.replace(/otras comunas.*$/i, '');
+
+    const parts = s
+        .split(/,|\n|;/g)
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+    const uniq: string[] = [];
+    for (const p of parts) {
+        if (!uniq.includes(p)) uniq.push(p);
+    }
+    return uniq.slice(0, 24);
+}
+
+const comunas = parseComunas(coverage.text);
+
+function clp(n: number) {
+    try {
+        return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n);
+    } catch {
+        return '$' + String(n);
+    }
+}
+
+type SliderEffect = 'fade' | 'slide';
+type SliderSettings = { effect: SliderEffect; intervalMs: number; transitionMs: number };
+type Slide = {
+    title: string;
+    subtitle: string;
+    image?: string;
+    imageAlt?: string;
+    primaryCta?: { label: string; href: string };
+    secondaryCta?: { label: string; href: string };
+    align?: 'left' | 'center' | 'right';
+    overlay?: string;
+    textColor?: string;
+};
+type SliderData = { settings: SliderSettings; slides: Slide[] };
+
+function asString(v: unknown, d = '') {
+    return typeof v === 'string' ? v : d;
+}
+function asNumber(v: unknown, d: number) {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : d;
+}
+function clamp(n: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, n));
+}
+function normalizeSlider(raw: any): SliderData {
+    const effect = asString(raw?.settings?.effect, 'fade');
+    const safeEffect: SliderEffect = effect === 'slide' ? 'slide' : 'fade';
+    const intervalMs = clamp(asNumber(raw?.settings?.intervalMs, 6000), 2000, 20000);
+    const transitionMs = clamp(asNumber(raw?.settings?.transitionMs, 600), 150, intervalMs - 50);
+
+    const slidesRaw = Array.isArray(raw?.slides) ? raw.slides : [];
+    const slides: Slide[] = slidesRaw
+        .filter((s: any) => s && typeof s === 'object')
+        .slice(0, 10)
+        .map((s: any) => ({
+            title: asString(s.title, ''),
+            subtitle: asString(s.subtitle, ''),
+            image: asString(s.image, ''),
+            imageAlt: asString(s.imageAlt, ''),
+            primaryCta: { label: asString(s?.primaryCta?.label, ''), href: asString(s?.primaryCta?.href, '') },
+            secondaryCta: { label: asString(s?.secondaryCta?.label, ''), href: asString(s?.secondaryCta?.href, '') },
+            align: s.align === 'center' || s.align === 'right' ? s.align : 'left',
+            overlay: asString(s.overlay, ''),
+            textColor: asString(s.textColor, ''),
+        }))
+        .filter((s: Slide) => s.title || s.subtitle || s.image);
+
+    if (slides.length) return { settings: { effect: safeEffect, intervalMs, transitionMs }, slides };
+
+    return {
+        settings: { effect: 'fade', intervalMs: 6000, transitionMs: 600 },
+        slides: [
+            {
+                title: hero.title,
+                subtitle: hero.subtitle,
+                primaryCta: hero.ctaPrimary,
+                secondaryCta: hero.ctaSecondary,
+                align: 'left'
+            }
+        ]
+    };
+}
+
+const slider = normalizeSlider(sliderRaw);
+const heroMedia = slider.slides.find((s) => !!s.image) || null;
+const heroImage = heroMedia?.image || '';
+
+function safeCssUrl(u: string) {
+    return (u || '').replace(/["'\\\n\r]/g, '');
+}
+const heroImageCss = safeCssUrl(heroImage);
+const heroSlidesCss = slider.slides
+    .filter((s: Slide) => !!s.image)
+    .slice(0, 6)
+    .map((s: Slide) => safeCssUrl(s.image || ''))
+    .filter(Boolean);
+const canUseSlider = sliderEnabled && heroSlidesCss.length > 1;
+const slideCount = heroSlidesCss.length || 1;
+const totalMs = Math.max(4000, slider.settings.intervalMs) * slideCount;
+
+const siteUrl = Astro.site ? Astro.site.href.replace(/\/$/, '') : '';
+const ldJson = {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: 'Construcciones Salas',
+    url: siteUrl || undefined,
+    image: heroImage || undefined,
+    telephone: contact.phone || undefined,
+    email: contact.email || undefined,
+    areaServed: comunas.length ? comunas : ['Santiago'],
+};
+---
+
+<head>
+    {heroImage && <link rel="preload" as="image" href={heroImage} media="(min-width: 601px)" />}
+    {canUseSlider && heroSlidesCss.slice(1, 2).map((u) => (
+        <link rel="preload" as="image" href={u} media="(min-width: 601px)" />
+    ))}
+    <script type="application/ld+json" set:html={JSON.stringify(ldJson)}></script>
+</head>
+
+<header class="site-header">
+    <div class="container header-inner">
+        <a class="brand" href="#">
+            <span class="brand-mark" aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                    <rect x="1" y="1" width="26" height="26" rx="6" fill="currentColor"/>
+                    <path d="M8 18h12v2H8v-2zm2-8h8v2h-8v-2zm1 4h6v2h-6v-2z" fill="#1F1F1F"/>
+                </svg>
+            </span>
+            <span class="brand-text">Construcciones Salas</span>
+        </a>
+        <nav class="header-actions">
+            <a class="btn btn-outline" href="/blog">Blog</a>
+            <button
+                class="btn btn-primary card-button"
+                type="button"
+                data-service-title="Presupuesto"
+                data-service-excerpt="Cuéntanos qué necesitas y te enviamos un presupuesto."
+                data-price-base="0"
+                data-price-unit="visita"
+                data-price-min="0"
+                data-price-note="El precio final depende del trabajo y materiales."
+            >
+                Solicitar presupuesto
+            </button>
+        </nav>
+    </div>
+</header>
+
+<section class={`hero ${canUseSlider ? 'hero-with-slider' : ''}`} style={heroImageCss ? `--hero-bg:url("${heroImageCss}")` : undefined}>
+    {canUseSlider && (
+        <div class="hero-slider-bg" style={`--hero-total-ms:${totalMs}ms;--hero-step-ms:${Math.max(4000, slider.settings.intervalMs)}ms;`} aria-hidden="true">
+            {heroSlidesCss.map((u, i) => (
+                <span class="hero-slide-bg" style={`--hero-i:${i};--hero-slide-bg:url("${u}")`}></span>
+            ))}
+        </div>
+    )}
+    <div class="container hero-inner">
+        <div class="hero-card">
+            <h1>{hero.title}</h1>
+            <p>{hero.subtitle}</p>
+            <div class="hero-actions">
+                <a class="btn btn-primary" href="#servicios">Cotizar ahora</a>
+                <a class="btn btn-outline-light" href={whatsappHref}>WhatsApp</a>
+                <a class="btn btn-outline-light" href={contact.phone ? `tel:${contact.phone}` : '#'}>Llamar</a>
+            </div>
+            <p class="hero-trust">Más de 30 años de experiencia · Electricidad y certificación de planos eléctricos</p>
+        </div>
+    </div>
+    <div class="hero-bg"></div>
+</section>
+
+<section class="services" id="servicios">
+    <div class="container">
+        <div class="section-head">
+            <h2>Servicios</h2>
+            <p>Selecciona un servicio y completa el presupuesto en 30 segundos.</p>
+        </div>
+        <div class="service-list">
+            {services.map((s: any) => (
+                <button
+                    class="service-item card-button"
+                    type="button"
+                    data-service-title={s.title}
+                    data-service-excerpt={s.excerpt}
+                    data-price-base={s?.price?.base ?? 0}
+                    data-price-unit={s?.price?.unit ?? 'servicio'}
+                    data-price-min={s?.price?.min ?? 0}
+                    data-price-note={s?.price?.note ?? ''}
+                >
+                    <div class="service-icon" aria-hidden="true">
+                        {s.icon === 'bolt' && (
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                                <path d="M13 2L3 14h7l-1 8 12-12h-8l1-8z" fill="currentColor"/>
+                            </svg>
+                        )}
+                        {s.icon === 'pipe' && (
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                                <path d="M6 4h12v4h-2v12H8V8H6V4z" stroke="currentColor" stroke-width="2" fill="none"/>
+                                <circle cx="12" cy="16" r="2" fill="currentColor"/>
+                            </svg>
+                        )}
+                        {s.icon === 'paint' && (
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                                <path d="M4 6h8l2 3h6v3h-8l-2-3H4V6z" stroke="currentColor" stroke-width="2" fill="none"/>
+                                <rect x="4" y="14" width="16" height="4" rx="2" fill="currentColor"/>
+                            </svg>
+                        )}
+                        {s.icon === 'home' && (
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-6H9v6H5a2 2 0 0 1-2-2v-9z" stroke="currentColor" stroke-width="2" fill="none"/>
+                            </svg>
+                        )}
+                        {!['bolt','pipe','paint','home'].includes(s.icon) && (
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                                <path d="M13 2L3 14h7l-1 8 12-12h-8l1-8z" fill="currentColor"/>
+                            </svg>
+                        )}
+                    </div>
+                    <div class="service-main">
+                        <h3>{s.title}</h3>
+                        <p>{s.excerpt}</p>
+                        <div class="service-meta">
+                            {(() => {
+                                const b = Number(s?.price?.base ?? 0);
+                                const m = Number(s?.price?.min ?? 0);
+                                const u = String(s?.price?.unit ?? 'servicio');
+                                const p = Math.max(b, m);
+                                if (p > 0) return <span class="service-price">{clp(p)} / {u}</span>;
+                                return <span class="service-price service-price-muted">Precio a convenir</span>;
+                            })()}
+                        </div>
+                    </div>
+                    <div class="service-cta" aria-hidden="true">Cotizar</div>
+                </button>
+            ))}
+        </div>
+        <div class="section-cta">
+            <button
+                class="btn btn-primary card-button"
+                type="button"
+                data-service-title="Presupuesto"
+                data-service-excerpt="Cuéntanos qué necesitas y te enviamos un presupuesto."
+                data-price-base="0"
+                data-price-unit="visita"
+                data-price-min="0"
+                data-price-note="El precio final depende del trabajo y materiales."
+            >
+                {hero.ctaPrimary?.label || 'Solicitar presupuesto'}
+            </button>
+        </div>
+    </div>
+</section>
+
+<dialog class="cs-budget" id="cs-budget" aria-labelledby="cs-budget-title" data-wa={waDigits} data-email={contact.email || ''}>
+    <form class="cs-budget-inner" id="cs-budget-form">
+        <header class="cs-budget-head">
+            <div>
+                <h2 id="cs-budget-title">Solicitud de presupuesto</h2>
+                <p class="cs-budget-sub" id="cs-budget-sub">Completa tus datos y envía por WhatsApp o correo.</p>
+            </div>
+            <button class="cs-budget-close" type="button" id="cs-budget-close" aria-label="Cerrar">×</button>
+        </header>
+
+        <div class="cs-budget-grid">
+            <div class="cs-budget-field">
+                <label for="cs-budget-service">Servicio</label>
+                <input id="cs-budget-service" name="service" type="text" readonly />
+            </div>
+            <div class="cs-budget-field">
+                <label for="cs-budget-desc">Descripción</label>
+                <textarea id="cs-budget-desc" name="desc" rows="3" readonly></textarea>
+            </div>
+
+            <div class="cs-budget-field">
+                <label for="cs-budget-name">Nombre</label>
+                <input id="cs-budget-name" name="name" type="text" autocomplete="name" required />
+            </div>
+            <div class="cs-budget-field">
+                <label for="cs-budget-phone">Teléfono</label>
+                <input id="cs-budget-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" />
+            </div>
+            <div class="cs-budget-field">
+                <label for="cs-budget-email">Correo</label>
+                <input id="cs-budget-email" name="email" type="email" autocomplete="email" />
+            </div>
+            <div class="cs-budget-field">
+                <label for="cs-budget-comuna">Comuna</label>
+                <input id="cs-budget-comuna" name="comuna" type="text" autocomplete="address-level2" />
+            </div>
+
+            <div class="cs-budget-field cs-budget-span">
+                <label for="cs-budget-details">Detalles del trabajo</label>
+                <textarea id="cs-budget-details" name="details" rows="4" placeholder="Ej: revisar tablero, cambiar enchufe, reparar gotera, instalar foco…" required></textarea>
+            </div>
+        </div>
+
+        <footer class="cs-budget-actions">
+            <button class="btn btn-outline" type="button" id="cs-budget-copy">Copiar texto</button>
+            <a class="btn btn-outline" id="cs-budget-email-btn" href="#" rel="noopener">Enviar por correo</a>
+            <a class="btn btn-primary" id="cs-budget-wa-btn" href="#" rel="noopener" target="_blank">Enviar por WhatsApp</a>
+        </footer>
+    </form>
+</dialog>
+
+<script is:inline>
+    (function () {
+        const dlg = document.getElementById('cs-budget');
+        const form = document.getElementById('cs-budget-form');
+        const closeBtn = document.getElementById('cs-budget-close');
+        if (!dlg || !(form instanceof HTMLFormElement) || !(closeBtn instanceof HTMLButtonElement)) return;
+
+        const serviceEl = document.getElementById('cs-budget-service');
+        const descEl = document.getElementById('cs-budget-desc');
+        const nameEl = document.getElementById('cs-budget-name');
+        const phoneEl = document.getElementById('cs-budget-phone');
+        const emailEl = document.getElementById('cs-budget-email');
+        const comunaEl = document.getElementById('cs-budget-comuna');
+        const detailsEl = document.getElementById('cs-budget-details');
+        const waBtn = document.getElementById('cs-budget-wa-btn');
+        const mailBtn = document.getElementById('cs-budget-email-btn');
+        const copyBtn = document.getElementById('cs-budget-copy');
+
+        if (
+            !(serviceEl instanceof HTMLInputElement) ||
+            !(descEl instanceof HTMLTextAreaElement) ||
+            !(nameEl instanceof HTMLInputElement) ||
+            !(phoneEl instanceof HTMLInputElement) ||
+            !(emailEl instanceof HTMLInputElement) ||
+            !(comunaEl instanceof HTMLInputElement) ||
+            !(detailsEl instanceof HTMLTextAreaElement) ||
+            !(waBtn instanceof HTMLAnchorElement) ||
+            !(mailBtn instanceof HTMLAnchorElement) ||
+            !(copyBtn instanceof HTMLButtonElement)
+        ) return;
+
+        const digits = (v) => String(v || '').replace(/[^\d]/g, '');
+        const waDigits = digits(dlg.getAttribute('data-wa') || '');
+        const defaultEmail = String(dlg.getAttribute('data-email') || '');
+
+        let note = '';
+        let lastFocus = null;
+        let open = false;
+
+        const openModal = () => {
+            open = true;
+            document.documentElement.classList.add('cs-modal-open');
+            if (typeof (dlg).showModal === 'function') {
+                (dlg).showModal();
+            } else {
+                dlg.setAttribute('open', '');
+                dlg.style.display = 'block';
+            }
+        };
+        const closeModal = () => {
+            open = false;
+            document.documentElement.classList.remove('cs-modal-open');
+            if (typeof (dlg).close === 'function') {
+                (dlg).close();
+            } else {
+                dlg.removeAttribute('open');
+                dlg.style.display = 'none';
+            }
+        };
+
+        const ensureContactValidity = () => {
+            const hasPhone = digits(phoneEl.value).length >= 8;
+            const hasEmail = (emailEl.value || '').trim().length > 3;
+            const ok = hasPhone || hasEmail;
+            const msg = ok ? '' : 'Ingresa teléfono o correo.';
+            phoneEl.setCustomValidity(msg);
+            emailEl.setCustomValidity(msg);
+            return ok;
+        };
+
+        const buildText = () => {
+            const lines = [];
+            lines.push('Solicitud de presupuesto');
+            lines.push('');
+            lines.push('Servicio: ' + (serviceEl.value || ''));
+            if (descEl.value) lines.push('Descripción: ' + descEl.value);
+            if (note) lines.push('Nota: ' + note);
+            lines.push('');
+            lines.push('Cliente: ' + (nameEl.value || ''));
+            if (comunaEl.value) lines.push('Comuna: ' + comunaEl.value);
+            if (phoneEl.value) lines.push('Teléfono: ' + phoneEl.value);
+            if (emailEl.value) lines.push('Correo: ' + emailEl.value);
+            lines.push('');
+            lines.push('Detalles:');
+            lines.push(detailsEl.value || '');
+            return lines.join('\n');
+        };
+
+        const update = () => {
+            const text = buildText();
+            const subject = 'Presupuesto - ' + (serviceEl.value || 'Servicio');
+
+            if (waDigits) {
+                waBtn.href = 'https://wa.me/' + waDigits + '?text=' + encodeURIComponent(text);
+                waBtn.setAttribute('aria-disabled', 'false');
+                waBtn.style.pointerEvents = '';
+                waBtn.style.opacity = '';
+            } else {
+                waBtn.href = '#';
+                waBtn.setAttribute('aria-disabled', 'true');
+                waBtn.style.pointerEvents = 'none';
+                waBtn.style.opacity = '0.5';
+            }
+
+            const mailTo = defaultEmail ? ('mailto:' + encodeURIComponent(defaultEmail)) : 'mailto:';
+            mailBtn.href = mailTo + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text);
+        };
+
+        const validateAndUpdate = () => {
+            ensureContactValidity();
+            update();
+        };
+
+        document.querySelectorAll('.card-button').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                lastFocus = btn;
+                serviceEl.value = btn.getAttribute('data-service-title') || '';
+                descEl.value = btn.getAttribute('data-service-excerpt') || '';
+                note = btn.getAttribute('data-price-note') || '';
+                validateAndUpdate();
+                openModal();
+                setTimeout(() => nameEl.focus(), 0);
+            });
+        });
+
+        [nameEl, phoneEl, emailEl, comunaEl, detailsEl].forEach((el) => {
+            el.addEventListener('input', validateAndUpdate);
+        });
+
+        copyBtn.addEventListener('click', async () => {
+            ensureContactValidity();
+            const text = buildText();
+            try {
+                await navigator.clipboard.writeText(text);
+                copyBtn.textContent = 'Copiado';
+                setTimeout(() => (copyBtn.textContent = 'Copiar texto'), 1200);
+            } catch {}
+        });
+
+        waBtn.addEventListener('click', (e) => {
+            if (!ensureContactValidity() || !form.reportValidity()) {
+                e.preventDefault();
+                return;
+            }
+            update();
+        });
+        mailBtn.addEventListener('click', (e) => {
+            if (!ensureContactValidity() || !form.reportValidity()) {
+                e.preventDefault();
+                return;
+            }
+            update();
+        });
+
+        closeBtn.addEventListener('click', () => closeModal());
+        dlg.addEventListener('cancel', (e) => {
+            e.preventDefault();
+            closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (!open) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeModal();
+            }
+        });
+
+        dlg.addEventListener('close', () => {
+            if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+        });
+    })();
+</script>
+
+<section class="about" id="sobre">
+    <div class="container">
+        <div class="section-head">
+            <h2>{about.title}</h2>
+            <p>{about.text}</p>
+        </div>
+    </div>
+</section>
+
+<section class="coverage" id="cobertura">
+    <div class="container">
+        <div class="section-head">
+            <h2>{coverage.title}</h2>
+            <p>{coverage.text}</p>
+        </div>
+        {comunas.length > 0 && (
+            <ul class="comunas-grid" aria-label="Comunas de cobertura">
+                {comunas.map((c) => (
+                    <li class="comuna">{c}</li>
+                ))}
+            </ul>
+        )}
+    </div>
+</section>
+
+{projects.length > 0 && (
+    <section class="projects" id="proyectos">
+        <div class="container">
+            <div class="section-head">
+                <h2>Proyectos</h2>
+                <p>Algunos trabajos realizados.</p>
+            </div>
+            <div class="grid">
+                {projects.slice(0, 8).map((p: any) => (
+                    <a class="tile tile-link" href={p.slug ? `/proyectos/${p.slug}` : '/proyectos'}>
+                        {p.image && <img src={p.image} alt={p.title || 'Proyecto'} loading="lazy" />}
+                        <h3>{p.title}</h3>
+                        {p.excerpt && <p>{p.excerpt}</p>}
+                    </a>
+                ))}
+            </div>
+            <div class="section-cta">
+                <a class="btn btn-outline" href="/proyectos">Ver todos los proyectos</a>
+            </div>
+        </div>
+    </section>
+)}
+
+{testimonials.length > 0 && (
+    <section class="testimonials" id="opiniones">
+        <div class="container">
+            <div class="section-head">
+                <h2>Opiniones</h2>
+                <p>Reseñas de clientes.</p>
+            </div>
+            <div class="grid">
+                {testimonials.slice(0, 6).map((t: any) => (
+                    <article class="tile tile-quote">
+                        <div class="quote">
+                            <p>{t.text}</p>
+                        </div>
+                        <div class="meta">
+                            <strong>{t.name}</strong>
+                            <span>{[t.service, t.location].filter(Boolean).join(' · ')}</span>
+                        </div>
+                    </article>
+                ))}
+            </div>
+        </div>
+    </section>
+)}
+
+{faqs.length > 0 && (
+    <section class="faq" id="faq">
+        <div class="container">
+            <div class="section-head">
+                <h2>Preguntas frecuentes</h2>
+                <p>Respuestas rápidas para que cotices con confianza.</p>
+            </div>
+            <div class="faq-list">
+                {faqs.slice(0, 10).map((f: any) => (
+                    <details class="faq-item">
+                        <summary>{f.question}</summary>
+                        <div class="faq-body">{f.answer}</div>
+                    </details>
+                ))}
+            </div>
+        </div>
+    </section>
+)}
+
+<section class="cta-dark" id="contacto">
+    <div class="container cta-inner">
+        <div class="cta-copy">
+            <h2>{contactCopy.title}</h2>
+            <p>{contactCopy.subtitle}</p>
+        </div>
+        <div class="cta-actions">
+            <a class="btn btn-primary btn-dark" href={contact.email ? `mailto:${contact.email}` : '#'}>Contactar</a>
+            <a class="btn btn-outline-light" href={whatsappHref}>WhatsApp</a>
+            <a class="btn btn-outline-light" href={contact.phone ? `tel:${contact.phone}` : '#'}>Llamar ahora</a>
+        </div>
+    </div>
+</section>
+
+<nav class="mobile-bar" aria-label="Acciones rápidas">
+    <a class="mobile-action" href={whatsappHref}>WhatsApp</a>
+    <a class="mobile-action" href={contact.phone ? `tel:${contact.phone}` : '#'}>Llamar</a>
+    <button
+        class="mobile-action mobile-action-primary card-button"
+        type="button"
+        data-service-title="Presupuesto general"
+        data-service-excerpt="Diagnóstico y cotización según el trabajo a realizar."
+        data-price-base="0"
+        data-price-unit="visita"
+        data-price-min="0"
+        data-price-note="El precio final depende del trabajo y materiales."
+    >
+        Presupuesto
+    </button>
+</nav>
+
+<footer class="site-footer">
+    <div class="container footer-inner">
+        <span>© Construcciones Salas</span>
+        <span class="footer-note">Profesionalismo, seguridad y experiencia.</span>
+    </div>
+</footer>
+
+<style>
+    .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: var(--bg);
+        border-bottom: 1px solid #eaeaea;
+    }
+    .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 72px;
+        gap: 12px;
+    }
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+    }
+    .brand-mark {
+        display: inline-flex;
+        color: var(--accent);
+    }
+    .brand-text {
+        color: var(--dark);
+        font-size: 18px;
+    }
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      
+        justify-content: flex-end;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 18px;
+        border-radius: 10px;
+        font-weight: 600;
+        border: none;
+        background: transparent;
+        font: inherit;
+        cursor: pointer;
+        transition: transform .08s ease, box-shadow .2s ease, background .2s ease, color .2s ease, border-color .2s ease;
+    }
+    .btn-primary {
+        background: var(--accent);
+        color: var(--dark);
+        box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 6px 16px rgba(0,0,0,.08);
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 0 rgba(0,0,0,.08), 0 10px 22px rgba(0,0,0,.12);
+    }
+    .btn-outline {
+        border: 2px solid var(--dark);
+        color: var(--dark);
+        background: transparent;
+    }
+    .btn-outline:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .hero {
+        position: relative;
+        background: #0f0f0f;
+        color: #fff;
+        overflow: hidden;
+        height: 50vh;
+    }
+    .hero-slider-bg {
+        display: none;
+    }
+    .hero-slide-bg {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transform: scale(1.02);
+        animation: hero-fade-cycle var(--hero-total-ms, 18000ms) linear infinite;
+        animation-delay: calc(var(--hero-i, 0) * var(--hero-step-ms, 6000ms));
+    }
+    .hero-inner {
+        padding: 168px 0 64px;
+        max-width: 760px;
+        position: relative;
+        z-index: 2;
+    }
+    @media (min-width: 601px) {
+        .hero {
+            background-image: var(--hero-bg);
+            background-size: cover;
+            background-position: center;
+        }
+        .hero-with-slider {
+            background-image: none;
+        }
+        .hero-slider-bg {
+            display: block;
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hero-slide-bg {
+            background-image: var(--hero-slide-bg);
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+        }
+    }
+    @keyframes hero-fade-cycle {
+        0% { opacity: .92; transform: scale(1.0); }
+        28% { opacity: .92; transform: scale(1.0); }
+        33% { opacity: 0; transform: scale(1.02); }
+        100% { opacity: 0; transform: scale(1.02); }
+    }
+    .hero-card {
+        background: rgba(15,15,15,.62);
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 18px;
+        padding: 22px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.35);
+        backdrop-filter: blur(8px);
+    }
+    .hero-card h1 {
+        color: #fff;
+        font-size: clamp(28px, 3.6vw, 44px);
+        line-height: 1.12;
+        margin: 0 0 10px;
+        letter-spacing: -0.2px;
+    }
+    .hero-card p {
+        margin: 0;
+        color: rgba(255,255,255,.82);
+        line-height: 1.65;
+        font-size: 16px;
+    }
+    .hero-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+    }
+    .hero-trust {
+        margin-top: 14px;
+        color: rgba(255,255,255,.72);
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    .cs-hero {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid #eaeaea;
+        background: #0f0f0f;
+        box-shadow: 0 12px 40px rgba(0,0,0,.12);
+    }
+    .cs-hero-radio {
+        position: absolute;
+        inline-size: 1px;
+        block-size: 1px;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .cs-hero-viewport {
+        position: relative;
+        height: clamp(240px, 40vw, 520px);
+    }
+    .cs-hero-slide {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transform: translateX(18px);
+        background: #0f0f0f;
+    }
+    #cs-hero-auto:checked ~ .cs-hero-viewport .cs-hero-slide {
+        animation-name: cs-hero-cycle;
+        animation-duration: var(--cs-hero-total-ms);
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+        animation-delay: calc(var(--cs-hero-i) * var(--cs-hero-interval-ms));
+    }
+    .cs-hero-slide img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(1.04) contrast(1.02);
+    }
+    .cs-hero-placeholder {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(900px 320px at 20% 10%, rgba(242,183,5,.22) 0%, transparent 60%), radial-gradient(900px 320px at 80% 0%, rgba(255,255,255,.08) 0%, transparent 60%), #0f0f0f;
+    }
+    .cs-hero-nav {
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 999px;
+        background: rgba(0,0,0,.35);
+        border: 1px solid rgba(255,255,255,.18);
+        backdrop-filter: blur(6px);
+    }
+    .cs-hero-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,.75);
+        background: rgba(0,0,0,.25);
+        cursor: pointer;
+    }
+    .cs-hero-dot:hover { background: rgba(242,183,5,.7); border-color: rgba(242,183,5,.9); }
+    .cs-hero-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,.75);
+        background: rgba(0,0,0,.25);
+        color: #fff;
+        font-size: 12px;
+        cursor: pointer;
+        margin-right: 6px;
+    }
+    @media (max-width: 720px) {
+        .hero-inner { padding: 28px 0 44px; }
+        .cs-hero-nav { right: 10px; bottom: 10px; }
+    }
+    .hero-bg {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(1200px 400px at 20% -20%, rgba(242,183,5,.15) 0%, transparent 60%), radial-gradient(900px 300px at 80% 0%, rgba(0,0,0,.06) 0%, transparent 60%);
+        z-index: 0;
+    }
+    .hero-inner, .services .container, .cta-inner {
+        position: relative;
+        z-index: 1;
+    }
+    .services {
+        padding: 56px 0;
+        background: var(--bg);
+    }
+    .section-head {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 24px;
+    }
+    .section-head h2 {
+        font-size: 28px;
+    }
+    .section-head p {
+        color: #5a5a5a;
+    }
+    .service-list {
+        display: grid;
+        gap: 12px;
+    }
+    .service-item {
+        width: 100%;
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 16px 16px;
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid #eee;
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 18px rgba(0,0,0,.04);
+    }
+    .service-item:hover {
+        border-color: rgba(242,183,5,.55);
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 12px 26px rgba(0,0,0,.08);
+    }
+    .service-icon {
+        color: var(--accent);
+        flex: 0 0 auto;
+        margin-top: 2px;
+    }
+    .service-main {
+        flex: 1 1 auto;
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+    }
+    .service-main h3 {
+        font-size: 18px;
+        margin: 0;
+    }
+    .service-main p {
+        margin: 0;
+        color: #5a5a5a;
+        line-height: 1.55;
+    }
+    .service-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .service-price {
+        font-size: 13px;
+        font-weight: 800;
+        color: #1F1F1F;
+        background: rgba(242,183,5,.2);
+        border: 1px solid rgba(242,183,5,.35);
+        padding: 6px 10px;
+        border-radius: 999px;
+    }
+    .service-price-muted {
+        background: #f6f6f6;
+        border-color: #eee;
+        color: #444;
+    }
+    .service-cta {
+        flex: 0 0 auto;
+        align-self: center;
+        font-weight: 800;
+        color: var(--dark);
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid #eee;
+        background: #fff;
+    }
+    .cards {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+    }
+    .card {
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 14px;
+        padding: 18px;
+        display: grid;
+        gap: 10px;
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 18px rgba(0,0,0,.04);
+    }
+    .card-button {
+        width: 100%;
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        color: inherit;
+    }
+    .card-button:focus-visible {
+        outline: 3px solid rgba(242,183,5,.55);
+        outline-offset: 3px;
+    }
+    .card-image {
+        width: 100%;
+        aspect-ratio: 16/9;
+        object-fit: cover;
+        border-radius: 10px;
+        border: 1px solid #f0f0f0;
+    }
+    .card-icon {
+        color: var(--accent);
+    }
+    .card h3 {
+        font-size: 18px;
+    }
+    .section-cta {
+        display: flex;
+        justify-content: center;
+        margin-top: 26px;
+    }
+    .about, .coverage, .projects, .testimonials, .faq {
+        padding: 56px 0;
+        background: var(--bg);
+    }
+    .coverage, .testimonials {
+        background: var(--bg-muted);
+    }
+    .comunas-grid {
+        margin: 18px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+    }
+    .comuna {
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 999px;
+        padding: 10px 12px;
+        text-align: center;
+        font-weight: 700;
+        color: #1F1F1F;
+        box-shadow: 0 1px 0 rgba(0,0,0,.03);
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+    }
+    .tile {
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 14px;
+        padding: 16px;
+        display: grid;
+        gap: 10px;
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 18px rgba(0,0,0,.04);
+    }
+    .tile-link {
+        cursor: pointer;
+    }
+    .tile-link:hover {
+        border-color: rgba(242,183,5,.55);
+        box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 12px 26px rgba(0,0,0,.08);
+    }
+    .tile-link:focus-visible {
+        outline: 3px solid rgba(242,183,5,.55);
+        outline-offset: 3px;
+    }
+    .tile img {
+        width: 100%;
+        aspect-ratio: 16/10;
+        object-fit: cover;
+        border-radius: 10px;
+        border: 1px solid #f0f0f0;
+    }
+    .tile h3 {
+        font-size: 16px;
+        margin: 0;
+    }
+    .tile p {
+        margin: 0;
+        color: #5a5a5a;
+    }
+    .tile-quote .quote p {
+        color: #1F1F1F;
+    }
+    .tile-quote .meta {
+        display: grid;
+        gap: 2px;
+        color: #5a5a5a;
+        font-size: 14px;
+    }
+    .faq-list {
+        display: grid;
+        gap: 10px;
+    }
+    .faq-item {
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 14px;
+        padding: 10px 14px;
+    }
+    .faq-item summary {
+        cursor: pointer;
+        font-weight: 700;
+        color: #1F1F1F;
+        padding: 6px 0;
+    }
+    .faq-body {
+        color: #5a5a5a;
+        padding: 6px 0 10px;
+    }
+    .cs-budget {
+        border: none;
+        padding: 0;
+        width: min(760px, 94vw);
+        border-radius: 16px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 18px 70px rgba(0,0,0,.25);
+    }
+    .cs-budget:not([open]) {
+        display: none;
+    }
+    .cs-budget::backdrop {
+        background: rgba(0,0,0,.55);
+    }
+    :global(html.cs-modal-open) {
+        overflow: hidden;
+    }
+    .cs-budget-inner {
+        padding: 18px;
+    }
+    .cs-budget-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+    }
+    .cs-budget-head h2 {
+        font-size: 22px;
+    }
+    .cs-budget-sub {
+        margin: 6px 0 0;
+        color: #5a5a5a;
+        line-height: 1.6;
+    }
+    .cs-budget-close {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        border: 1px solid #eee;
+        background: #fff;
+        cursor: pointer;
+        font-size: 22px;
+        line-height: 1;
+        color: #1F1F1F;
+    }
+    .cs-budget-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .cs-budget-field {
+        display: grid;
+        gap: 6px;
+    }
+    .cs-budget-field label {
+        font-size: 13px;
+        color: #444;
+        font-weight: 600;
+    }
+    .cs-budget-field input,
+    .cs-budget-field textarea {
+        border: 1px solid #eaeaea;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font: inherit;
+        color: #1F1F1F;
+        background: #fff;
+    }
+    .cs-budget-field textarea {
+        resize: vertical;
+    }
+    .cs-budget-span {
+        grid-column: span 2;
+    }
+    .cs-budget-hint {
+        font-size: 12px;
+        color: #7a7a7a;
+    }
+    .cs-budget-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #f0f0f0;
+    }
+    .cta-dark {
+        background: var(--dark);
+        color: #fff;
+        padding: 44px 0;
+    }
+    .cta-inner {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+        align-items: center;
+    }
+    .cta-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .btn-dark {
+        background: var(--accent);
+        color: var(--dark);
+    }
+    .btn-outline-light {
+        border: 2px solid #fff;
+        color: #fff;
+        background: transparent;
+    }
+    .btn-outline-light:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(255,255,255,.06);
+    }
+    .mobile-bar {
+        display: none;
+    }
+    .mobile-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 14px;
+        border-radius: 14px;
+        font-weight: 800;
+        border: 1px solid rgba(255,255,255,.18);
+        background: rgba(15,15,15,.78);
+        color: #fff;
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+    }
+    .mobile-action-primary {
+        background: var(--accent);
+        color: var(--dark);
+        border-color: rgba(0,0,0,.08);
+    }
+    .site-footer {
+        background: var(--bg);
+        border-top: 1px solid #eaeaea;
+    }
+    .footer-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 0;
+        font-size: 14px;
+        color: #5a5a5a;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .footer-note {
+        color: #444;
+    }
+    @media (max-width: 900px) {
+        .header-inner {
+            height: auto;
+            padding: 12px 0;
+        }
+        .header-actions {
+            gap: 8px;
+            flex-wrap: nowrap;
+        }
+        .header-actions .btn {
+            padding: 10px 12px;
+            font-size: 14px;
+        }
+        .hero-inner {
+            padding: 32px 0 48px;
+        }
+        .hero-inner {
+            grid-template-columns: 1fr;
+        }
+        .cards {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .cta-inner {
+            grid-template-columns: 1fr;
+            justify-items: start;
+        }
+        .cta-actions {
+            justify-content: flex-start;
+        }
+    }
+    @media (max-width: 600px) {
+        :global(body) {
+            padding-bottom: 86px;
+        }
+        .site-header {
+            background: rgba(255,255,255,.96);
+            backdrop-filter: blur(8px);
+        }
+        .header-inner {
+            display: grid;
+            grid-template-columns: 1fr;
+            height: auto;
+            gap: 8px;
+            padding: 10px 4px;
+        }
+        .brand {
+            justify-content: center;
+        }
+        .brand-mark {
+            display: none;
+        }
+        .brand-text {
+            font-size: 16px;
+        }
+        .header-actions {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .header-actions .btn {
+            width: 100%;
+            padding: 9px 10px;
+            border-radius: 10px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        .hero {
+            height: fit-content;
+        }
+        .hero-inner {
+            padding: 24px 0 36px;
+        }
+        .cs-hero-viewport {
+            height: clamp(220px, 58vw, 420px);
+        }
+        .cta-dark {
+            padding: 36px 0;
+        }
+        .cta-actions {
+            width: 100%;
+        }
+        .cta-actions .btn {
+            width: 100%;
+        }
+        .mobile-bar {
+            display: flex;
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            z-index: 50;
+            gap: 10px;
+        }
+        .mobile-action {
+            flex: 1 1 0;
+        }
+        .cards {
+            grid-template-columns: 1fr;
+        }
+        .grid {
+            grid-template-columns: 1fr;
+        }
+        .comunas-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .comuna {
+            padding: 9px 10px;
+            font-size: 13px;
+        }
+        .cs-budget-inner {
+            padding: 14px;
+        }
+        .cs-budget-grid {
+            grid-template-columns: 1fr;
+        }
+        .cs-budget-span {
+            grid-column: auto;
+        }
+    }
+</style>
